@@ -26,22 +26,28 @@ bool checkIntersection(CRay ray, CSphere S, CVector3D * hit)
 	b=2*((ray.center-S.center)*ray.vector);           
 	c=((ray.center-S.center)*(ray.center-S.center))-S.R*S.R;
 
-	D=b*b - 4*a*c; 
+	D=b*b - 4*c; 
 
 	//Если дискриминант больше 0 значит пересечение есть
 	if(D>0) 
 	{	
+		t=-1;
 		//находим положительный корень
 		float t1=(-b-sqrtSSE(D))/(2);
-		float t2=(b-sqrtSSE(D))/(2);
+		float t2=(-b-sqrtSSE(D))/(2);
 
-		if (t1>=0)
+		if (t1>=0.1f)
 		{
 			t=t1;
 		}
-		else
+		if (t2>=0.1f)
 		{
 			t=t2;
+		}
+		//Если нет положительного корня
+		if (t<0)
+		{
+			return false;
 		}
 		//Находим пересечение
 		hit->x = ray.center.x+t*ray.vector.x;
@@ -106,22 +112,44 @@ void RayTracer(HBITMAP bitmap,CSphere S[], CVector3D lightsArray[])
 						lightdir.y=light.y-hit.y;
 						lightdir.z=light.z-hit.z;
 						lightdir.NormalizeVector();
+						
+						
+						bool inShadow=false;
 						//Находим коэффициент освещения
 						coefLight=snormal*lightdir;
 						//Если коэффициент больше 0 то свет попадает
 						if(coefLight>0){
-							//Если значение RGB > чем текущее то заменяем его
-							if (coefLight*S[n].color.rgbBlue>currentColor.rgbBlue)
+							//Проверяем не затенен ли данный объект другим объектом
+							for (int index=0; index<2; index++)
 							{
-								currentColor.rgbBlue=coefLight*S[n].color.rgbBlue;
+								CRay lightRay(hit,lightdir);
+								if(index==n) 
+									continue;
+								CVector3D lightHit;
+								if (checkIntersection(lightRay,S[index],&lightHit))
+								{
+									inShadow=true;
+									break;
+								}
 							}
-							if (coefLight*S[n].color.rgbGreen>currentColor.rgbGreen)
-							{
-								currentColor.rgbGreen=coefLight*S[n].color.rgbGreen;
-							}
-							if (coefLight*S[n].color.rgbRed>currentColor.rgbRed)
-							{
-								currentColor.rgbRed=coefLight*S[n].color.rgbRed;
+							if(!inShadow)
+							{												
+								//Если значение RGB > чем текущее то заменяем его
+								currentColor.rgbRed+=coefLight*S[n].color.rgbRed*0.5;
+								currentColor.rgbGreen+=coefLight*S[n].color.rgbGreen*0.5;
+								currentColor.rgbBlue+=coefLight*S[n].color.rgbBlue*0.5;
+								/*if (coefLight*S[n].color.rgbBlue>currentColor.rgbBlue)
+								{
+									currentColor.rgbBlue=coefLight*S[n].color.rgbBlue;
+								}
+								if (coefLight*S[n].color.rgbGreen>currentColor.rgbGreen)
+								{
+									currentColor.rgbGreen=coefLight*S[n].color.rgbGreen;
+								}
+								if (coefLight*S[n].color.rgbRed>currentColor.rgbRed)
+								{
+									currentColor.rgbRed=coefLight*S[n].color.rgbRed;
+								}*/
 							}
 						}
 					}		
@@ -131,7 +159,6 @@ void RayTracer(HBITMAP bitmap,CSphere S[], CVector3D lightsArray[])
 			}			
 		}
 	}
-	//light.Get2DCoord(&tt);
 	SetBitmapBits(bitmap,XRES*YRES*sizeof(buffer[0][0]),buffer);
 	memset(buffer,25,XRES*YRES*sizeof(buffer[0][0]));
 }
