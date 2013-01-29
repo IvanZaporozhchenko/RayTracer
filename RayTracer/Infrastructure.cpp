@@ -103,6 +103,11 @@ CVector3D operator * (float scalar, const CVector3D &vector)
 	return res;
 }
 
+CSphere::CSphere()
+{
+	
+}
+
 CSphere::CSphere(float x,float y,float z,float r,RGBQUAD color)
 {
 	CVector3D center(x,y,z);

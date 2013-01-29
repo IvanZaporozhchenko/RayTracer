@@ -26,7 +26,7 @@ bool checkIntersection(CRay ray, CSphere sphereArray[], CVector3D * hit, int * n
 	//Проверка на столкновение
 	//Формулы сзяты с данного сайта http://www.cs.huji.ac.il/course/2006/cg/slides/raytracing.pdf
 	//Решаем квадратное уравнение 
-	for (int i=0; i<2; i++)
+	for (int i=0; i<SPHERE_COUNT; i++)
 	{	
 		CSphere S=sphereArray[i];
 		a = 1;
@@ -91,7 +91,7 @@ RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
 		snormal.z=(hit.z-S[n].center.z);
 		snormal.NormalizeVector();		
 		//Проверяем каждый источник света
-		for (int lightIndex=0; lightIndex<2; lightIndex++)
+		for (int lightIndex=0; lightIndex<LIGHT_COUNT; lightIndex++)
 		{
 			light=lightsArray[lightIndex];
 			lightdir.x=light.x-hit.x;
@@ -107,7 +107,7 @@ RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
 				//луч от источника света к месту пересечения с объектом
 				CRay lightRay(hit,lightdir);
 				//Проверяем не затенен ли данный объект другим объектом
-				for (int index=0; index<2; index++)
+				for (int index=0; index<SPHERE_COUNT; index++)
 				{
 					
 					/*if(index==n) 
@@ -149,9 +149,31 @@ RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
 					{
 						int k=1;
 					}
-					currentColor.rgbRed+=coefLight*S[n].color.rgbRed*0.5+reflectionColor.rgbRed*coef;
-					currentColor.rgbGreen+=coefLight*S[n].color.rgbGreen*0.5+reflectionColor.rgbGreen*coef;
-					currentColor.rgbBlue+=coefLight*S[n].color.rgbBlue*0.5+reflectionColor.rgbRed*coef;
+					if ((int)currentColor.rgbRed+coefLight*S[n].color.rgbRed*0.5+reflectionColor.rgbRed*coef>=255)
+					{
+						currentColor.rgbRed=255;
+					}
+					else
+					{
+						currentColor.rgbRed+=coefLight*S[n].color.rgbRed*0.5+reflectionColor.rgbRed*coef;
+					}					
+					if ((int)currentColor.rgbGreen+coefLight*S[n].color.rgbGreen*0.5+reflectionColor.rgbGreen*coef>=255)
+					{
+						currentColor.rgbGreen=255;
+					}
+					else
+					{
+						currentColor.rgbGreen+=coefLight*S[n].color.rgbGreen*0.5+reflectionColor.rgbGreen*coef;
+					}
+					if ((int)currentColor.rgbBlue+coefLight*S[n].color.rgbBlue*0.5+reflectionColor.rgbBlue*coef>=255)
+					{
+						currentColor.rgbBlue=255;
+					}
+					else
+					{
+						currentColor.rgbBlue+=coefLight*S[n].color.rgbBlue*0.5+reflectionColor.rgbBlue*coef;
+					}
+					
 					//Блинн-Фонг взято с http://www.codermind.com/articles/Raytracer-in-C++-Part-II-Specularity-post-processing.html
 					float fViewProjection=ray.vector*snormal;
 					CVector3D blinnVector=lightRay.vector-ray.vector;
@@ -160,9 +182,30 @@ RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
 					{
 						float blinn=1/sqrtSSE(temp) * max(coefLight-fViewProjection,0.0f);
 						blinn=coef*powf(blinn,20);
-						currentColor.rgbRed+=blinn*S[n].color.rgbRed;
-						currentColor.rgbGreen+=blinn*S[n].color.rgbGreen;
-						currentColor.rgbBlue+=blinn*S[n].color.rgbBlue;
+						if ((int)currentColor.rgbRed+blinn*S[n].color.rgbRed>=255)
+						{
+							currentColor.rgbRed=255;
+						}
+						else
+						{
+							currentColor.rgbRed+=blinn*S[n].color.rgbRed;
+						}
+						if ((int)currentColor.rgbGreen+blinn*S[n].color.rgbGreen>=255)
+						{
+							currentColor.rgbGreen=255;
+						}
+						else
+						{
+							currentColor.rgbGreen+=blinn*S[n].color.rgbGreen;
+						}
+						if ((int)currentColor.rgbBlue+blinn*S[n].color.rgbBlue>=255)
+						{
+							currentColor.rgbBlue=255;
+						}
+						else
+						{
+							currentColor.rgbBlue+=blinn*S[n].color.rgbBlue;
+						}						
 					}
 				}
 			}

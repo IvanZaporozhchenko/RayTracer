@@ -40,23 +40,32 @@ int _stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 	MSG msg;
 	DWORD bits[500][500];
 	HBITMAP hBitmap;
-
-	//Инициализация сцены
 	RGBQUAD color;
-	color.rgbRed=255;
-	color.rgbBlue=100;
-	color.rgbGreen=20;
-	color.rgbReserved=0;
-	CSphere S(2,0,4,1,color);
-	color.rgbRed=100;
-	color.rgbBlue=100;
-	color.rgbGreen=244;
-	color.rgbReserved=0;
-	CSphere S2(-2,0,3,1,color);
-	CSphere SArray[]={S,S2};
-	CVector3D light(1,-5,3);
-	CVector3D light2(1,1,3);
-	CVector3D lightArray[]={light,light2};
+	float x,y,z,r;
+	//Инициализация сцены
+	CSphere SArray[SPHERE_COUNT];
+	for (int i=0; i<SPHERE_COUNT; i++)
+	{
+		color.rgbRed=rand()%255;
+		color.rgbBlue=rand()%255;
+		color.rgbGreen=rand()%255;
+		x=rand()%10-5;
+		y=rand()%10-5;
+		z=rand()%5+5;
+		r=(rand()%5+5)/10.0f;
+		SArray[i]=CSphere(x,y,z,r,color);	
+	}
+	
+	CVector3D lightArray[LIGHT_COUNT];
+
+	for (int i=0; i<LIGHT_COUNT; i++)
+	{
+		lightArray[i].x=rand()%5;
+		lightArray[i].y=rand()%5;
+		lightArray[i].z=rand()%5;
+	}
+
+	
 	hBitmap=CreateBitmap(500,500,1,32,bits);
 	while(true)
 	{

@@ -6,6 +6,8 @@
 #define DIST 1
 #define XRES 500
 #define YRES 500
+#define SPHERE_COUNT 10
+#define LIGHT_COUNT 1
 
 class CVector2D 
 {
@@ -38,6 +40,7 @@ public:
 	CVector3D center;
 	float R;
 	RGBQUAD color;
+	CSphere::CSphere();
 	CSphere::CSphere(float x,float y,float z,float r,RGBQUAD color);
 };
 
