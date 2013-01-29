@@ -94,6 +94,15 @@ void CVector3D::NormalizeVector()
 	this->z/=mod;
 }
 
+CVector3D operator * (float scalar, CVector3D vector)
+{
+	CVector3D res;
+	res.x=vector.x*scalar;
+	res.y=vector.y*scalar;
+	res.z=vector.z*scalar;
+	return res;
+}
+
 CSphere::CSphere(float x,float y,float z,float r,RGBQUAD color)
 {
 	CVector3D center(x,y,z);

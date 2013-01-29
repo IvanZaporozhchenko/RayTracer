@@ -15,47 +15,60 @@ COLORREF buffer[YRES][XRES];
 // Parameter: CRay ray - луч
 // Parameter: CSphere S - сфера
 // Parameter: CRVector3D * hit - точка пересечения
+// Parameter: int * n - номер объекта с которым находится ближайшее пересечение
 //************************************
-bool checkIntersection(CRay ray, CSphere S, CVector3D * hit)
+bool checkIntersection(CRay ray, CSphere sphereArray[], CVector3D * hit, int * n)
 {
-	float a,b,c,D,t;
+	float a,b,c,D,t,tmin;
+	bool intersectionFinded=false;
+	tmin=30000;
 	//Проверка на столкновение
 	//Формулы сзяты с данного сайта http://www.cs.huji.ac.il/course/2006/cg/slides/raytracing.pdf
 	//Решаем квадратное уравнение 
-	a = 1;
-	b=2*((ray.center-S.center)*ray.vector);           
-	c=((ray.center-S.center)*(ray.center-S.center))-S.R*S.R;
-
-	D=b*b - 4*c; 
-
-	//Если дискриминант больше 0 значит пересечение есть
-	if(D>0) 
+	for (int i=0; i<2; i++)
 	{	
-		t=-1;
-		//находим положительный корень
-		float t1=(-b-sqrtSSE(D))/(2);
-		float t2=(-b-sqrtSSE(D))/(2);
+		CSphere S=sphereArray[i];
+		a = 1;
+		b=2*((ray.center-S.center)*ray.vector);           
+		c=((ray.center-S.center)*(ray.center-S.center))-S.R*S.R;
 
-		if (t1>=0.1f)
-		{
-			t=t1;
+		D=b*b - 4*c; 
+
+		//Если дискриминант больше 0 значит пересечение есть
+		if(D>0) 
+		{	
+			t=-1;
+			//находим положительный корень
+			float t1=(-b-sqrtSSE(D))/(2);
+			float t2=(-b-sqrtSSE(D))/(2);
+
+			if (t1>=0.1f)
+			{
+				t=t1;
+			}
+			if (t2>=0.1f)
+			{
+				t=t2;
+			}
+			//Если нет положительного корня
+			if (t<0)
+			{
+				continue;
+			}
+			//tmin - минимальное расстояние до пересечение
+			if (tmin>t)
+			{
+				tmin=t;
+				*n=i;
+				//Находим пересечение
+				hit->x = ray.center.x+t*ray.vector.x;
+				hit->y = ray.center.y+t*ray.vector.y; 
+				hit->z = ray.center.z+t*ray.vector.z;
+				intersectionFinded=true;
+			}
 		}
-		if (t2>=0.1f)
-		{
-			t=t2;
-		}
-		//Если нет положительного корня
-		if (t<0)
-		{
-			return false;
-		}
-		//Находим пересечение
-		hit->x = ray.center.x+t*ray.vector.x;
-		hit->y = ray.center.y+t*ray.vector.y; 
-		hit->z = ray.center.z+t*ray.vector.z;
-		return true;
 	}
-	return false;
+	return intersectionFinded;
 }
 
 //************************************
@@ -90,73 +103,58 @@ void RayTracer(HBITMAP bitmap,CSphere S[], CVector3D lightsArray[])
 			CVector3D hit;
 			CVector3D eye(0,0,0);
 			CRay ray(eye,rayVector);
-			//Проверка на пересечение с каждым объектом
-			for (int n=0; n<2; n++)
-			{
-				if(checkIntersection(ray,S[n],&hit)) 
-				{	
-					//Вычисляем нормаль
-					snormal.x=(hit.x-S[n].center.x);
-					snormal.y=(hit.y-S[n].center.y);
-					snormal.z=(hit.z-S[n].center.z);
-					snormal.NormalizeVector();
-					RGBQUAD currentColor;
-					currentColor.rgbBlue=0;
-					currentColor.rgbGreen=0;
-					currentColor.rgbRed=0;
-					//Проверяем каждый источник света
-					for (int lightIndex=0; lightIndex<2; lightIndex++)
-					{
-						light=lightsArray[lightIndex];
-						lightdir.x=light.x-hit.x;
-						lightdir.y=light.y-hit.y;
-						lightdir.z=light.z-hit.z;
-						lightdir.NormalizeVector();
+			int n;
+			if(checkIntersection(ray,S,&hit,&n)) 
+			{	
+				//Вычисляем нормаль
+				snormal.x=(hit.x-S[n].center.x);
+				snormal.y=(hit.y-S[n].center.y);
+				snormal.z=(hit.z-S[n].center.z);
+				snormal.NormalizeVector();
+				RGBQUAD currentColor;
+				currentColor.rgbBlue=0;
+				currentColor.rgbGreen=0;
+				currentColor.rgbRed=0;
+				//Проверяем каждый источник света
+				for (int lightIndex=0; lightIndex<2; lightIndex++)
+				{
+					light=lightsArray[lightIndex];
+					lightdir.x=light.x-hit.x;
+					lightdir.y=light.y-hit.y;
+					lightdir.z=light.z-hit.z;
+					lightdir.NormalizeVector();
 						
 						
-						bool inShadow=false;
-						//Находим коэффициент освещения
-						coefLight=snormal*lightdir;
-						//Если коэффициент больше 0 то свет попадает
-						if(coefLight>0){
-							//Проверяем не затенен ли данный объект другим объектом
-							for (int index=0; index<2; index++)
+					bool inShadow=false;
+					//Находим коэффициент освещения
+					coefLight=snormal*lightdir;
+					//Если коэффициент больше 0 то свет попадает
+					if(coefLight>0){
+						//Проверяем не затенен ли данный объект другим объектом
+						for (int index=0; index<2; index++)
+						{
+							CRay lightRay(hit,lightdir);
+							if(index==n) 
+								continue;
+							CVector3D lightHit;
+							if (checkIntersection(lightRay,S,&lightHit,NULL))
 							{
-								CRay lightRay(hit,lightdir);
-								if(index==n) 
-									continue;
-								CVector3D lightHit;
-								if (checkIntersection(lightRay,S[index],&lightHit))
-								{
-									inShadow=true;
-									break;
-								}
-							}
-							if(!inShadow)
-							{												
-								//Если значение RGB > чем текущее то заменяем его
-								currentColor.rgbRed+=coefLight*S[n].color.rgbRed*0.5;
-								currentColor.rgbGreen+=coefLight*S[n].color.rgbGreen*0.5;
-								currentColor.rgbBlue+=coefLight*S[n].color.rgbBlue*0.5;
-								/*if (coefLight*S[n].color.rgbBlue>currentColor.rgbBlue)
-								{
-									currentColor.rgbBlue=coefLight*S[n].color.rgbBlue;
-								}
-								if (coefLight*S[n].color.rgbGreen>currentColor.rgbGreen)
-								{
-									currentColor.rgbGreen=coefLight*S[n].color.rgbGreen;
-								}
-								if (coefLight*S[n].color.rgbRed>currentColor.rgbRed)
-								{
-									currentColor.rgbRed=coefLight*S[n].color.rgbRed;
-								}*/
+								inShadow=true;
+								break;
 							}
 						}
-					}		
-					//Записываем в буфер конечный цвет
-					buffer[i+YRES/2][j+XRES/2]= RGB(currentColor.rgbRed,currentColor.rgbGreen,currentColor.rgbBlue);
-				}	//(kd*factor*R, kd*factor*G, kd*factor*B).+ (ka*R, ka*G, Ka*B).
-			}			
+						if(!inShadow)
+						{												
+							//Если значение RGB > чем текущее то заменяем его
+							currentColor.rgbRed+=coefLight*S[n].color.rgbRed*0.5;
+							currentColor.rgbGreen+=coefLight*S[n].color.rgbGreen*0.5;
+							currentColor.rgbBlue+=coefLight*S[n].color.rgbBlue*0.5;
+						}
+					}
+				}		
+				//Записываем в буфер конечный цвет
+				buffer[i+YRES/2][j+XRES/2]= RGB(currentColor.rgbRed,currentColor.rgbGreen,currentColor.rgbBlue);
+			}	//(kd*factor*R, kd*factor*G, kd*factor*B).+ (ka*R, ka*G, Ka*B).			
 		}
 	}
 	SetBitmapBits(bitmap,XRES*YRES*sizeof(buffer[0][0]),buffer);

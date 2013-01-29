@@ -47,12 +47,12 @@ int _stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 	color.rgbBlue=100;
 	color.rgbGreen=20;
 	color.rgbReserved=0;
-	CSphere S(-3,0,5,1,color);
+	CSphere S(0,0,3,1,color);
 	color.rgbRed=100;
 	color.rgbBlue=100;
 	color.rgbGreen=244;
 	color.rgbReserved=0;
-	CSphere S2(3,0,5,1,color);
+	CSphere S2(0,-2,4,1,color);
 	CSphere SArray[]={S,S2};
 	CVector3D light(0,-5,0);
 	CVector3D light2(0,5,10);

@@ -29,6 +29,7 @@ public:
 	CVector3D operator + (const CVector3D& right);
 	CVector3D operator - (const CVector3D& right);
 	float operator * (const CVector3D& right); //Скалярное произведение
+	
 };
 
 class CSphere
@@ -48,5 +49,7 @@ public:
 
 	CRay(CVector3D center, CVector3D vector);
 };
+
+CVector3D operator * (float scalar, const CVector3D& vector);
 
 float sqrtSSE(float x); //Корень квадратный на ассемблере
