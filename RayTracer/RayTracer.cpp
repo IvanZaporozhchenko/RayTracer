@@ -1,6 +1,7 @@
 #include "RayTracer.h"
 #include "Infrastructure.h"
 #include <windows.h>
+#include <math.h>
 
 #define BACKGROUND_COLOR RGB(20,20,20)
 
@@ -71,6 +72,105 @@ bool checkIntersection(CRay ray, CSphere sphereArray[], CVector3D * hit, int * n
 	return intersectionFinded;
 }
 
+RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
+{
+	int n;
+	RGBQUAD currentColor;
+	currentColor.rgbBlue=20;
+	currentColor.rgbGreen=20;
+	currentColor.rgbRed=20;
+	CVector3D hit,light,lightdir,snormal;
+	if(checkIntersection(ray,S,&hit,&n)) 
+	{	
+		currentColor.rgbBlue=0;
+		currentColor.rgbGreen=0;
+		currentColor.rgbRed=0;
+		//Вычисляем нормаль
+		snormal.x=(hit.x-S[n].center.x);
+		snormal.y=(hit.y-S[n].center.y);
+		snormal.z=(hit.z-S[n].center.z);
+		snormal.NormalizeVector();		
+		//Проверяем каждый источник света
+		for (int lightIndex=0; lightIndex<2; lightIndex++)
+		{
+			light=lightsArray[lightIndex];
+			lightdir.x=light.x-hit.x;
+			lightdir.y=light.y-hit.y;
+			lightdir.z=light.z-hit.z;
+			lightdir.NormalizeVector();
+
+			bool inShadow=false;
+			//Находим коэффициент освещения
+			float coefLight=snormal*lightdir;
+			//Если коэффициент больше 0 то свет попадает
+			if(coefLight>0){
+				//луч от источника света к месту пересечения с объектом
+				CRay lightRay(hit,lightdir);
+				//Проверяем не затенен ли данный объект другим объектом
+				for (int index=0; index<2; index++)
+				{
+					
+					/*if(index==n) 
+						continue;*/
+					CVector3D lightHit;
+					int num;
+					if (checkIntersection(lightRay,S,&lightHit,&num))
+					{
+						inShadow=true;
+						break;
+					}
+				}
+				if(!inShadow)
+				{		
+					//Создаем отражающий луч
+					CVector3D reflectionVector=(ray.vector-2*(((ray.vector*snormal))*snormal));
+					CRay reflectionRay(hit,reflectionVector);
+					RGBQUAD reflectionColor;
+					float coef=1;
+					for (int i=0; i<level; i++)
+					{
+						//coef*=reflectionVector*ray.vector;
+						coef*=0.5;
+					}
+
+					if(level<10)
+					{
+						reflectionColor=TraceOneRay(reflectionRay,S,lightsArray,++level);
+					}
+					
+					//Свет по Ламберту
+					if (reflectionColor.rgbRed==20 && reflectionColor.rgbGreen==20 && reflectionColor.rgbBlue==20)
+					{
+						reflectionColor.rgbBlue=0;
+						reflectionColor.rgbGreen=0;
+						reflectionColor.rgbRed=0;
+					}
+					else
+					{
+						int k=1;
+					}
+					currentColor.rgbRed+=coefLight*S[n].color.rgbRed*0.5+reflectionColor.rgbRed*coef;
+					currentColor.rgbGreen+=coefLight*S[n].color.rgbGreen*0.5+reflectionColor.rgbGreen*coef;
+					currentColor.rgbBlue+=coefLight*S[n].color.rgbBlue*0.5+reflectionColor.rgbRed*coef;
+					//Блинн-Фонг взято с http://www.codermind.com/articles/Raytracer-in-C++-Part-II-Specularity-post-processing.html
+					float fViewProjection=ray.vector*snormal;
+					CVector3D blinnVector=lightRay.vector-ray.vector;
+					float temp=blinnVector*blinnVector;
+					if (temp!=0)
+					{
+						float blinn=1/sqrtSSE(temp) * max(coefLight-fViewProjection,0.0f);
+						blinn=coef*powf(blinn,20);
+						currentColor.rgbRed+=blinn*S[n].color.rgbRed;
+						currentColor.rgbGreen+=blinn*S[n].color.rgbGreen;
+						currentColor.rgbBlue+=blinn*S[n].color.rgbBlue;
+					}
+				}
+			}
+		}		
+	}	
+	return currentColor;
+}
+
 //************************************
 // Method:    RayTracer
 // FullName:  Трассировка лучей
@@ -92,6 +192,10 @@ void RayTracer(HBITMAP bitmap,CSphere S[], CVector3D lightsArray[])
 	{
 		for(j=-500/2;j<500/2;j++)
 		{
+			if (j==100 && i==0)
+			{
+				int bla=0;
+			}
 			//Изначально задаем цвет фона
 			buffer[i+YRES/2][j+XRES/2]=BACKGROUND_COLOR;
 			//Вычиляем вектор для луча
@@ -103,58 +207,9 @@ void RayTracer(HBITMAP bitmap,CSphere S[], CVector3D lightsArray[])
 			CVector3D hit;
 			CVector3D eye(0,0,0);
 			CRay ray(eye,rayVector);
-			int n;
-			if(checkIntersection(ray,S,&hit,&n)) 
-			{	
-				//Вычисляем нормаль
-				snormal.x=(hit.x-S[n].center.x);
-				snormal.y=(hit.y-S[n].center.y);
-				snormal.z=(hit.z-S[n].center.z);
-				snormal.NormalizeVector();
-				RGBQUAD currentColor;
-				currentColor.rgbBlue=0;
-				currentColor.rgbGreen=0;
-				currentColor.rgbRed=0;
-				//Проверяем каждый источник света
-				for (int lightIndex=0; lightIndex<2; lightIndex++)
-				{
-					light=lightsArray[lightIndex];
-					lightdir.x=light.x-hit.x;
-					lightdir.y=light.y-hit.y;
-					lightdir.z=light.z-hit.z;
-					lightdir.NormalizeVector();
-						
-						
-					bool inShadow=false;
-					//Находим коэффициент освещения
-					coefLight=snormal*lightdir;
-					//Если коэффициент больше 0 то свет попадает
-					if(coefLight>0){
-						//Проверяем не затенен ли данный объект другим объектом
-						for (int index=0; index<2; index++)
-						{
-							CRay lightRay(hit,lightdir);
-							if(index==n) 
-								continue;
-							CVector3D lightHit;
-							if (checkIntersection(lightRay,S,&lightHit,NULL))
-							{
-								inShadow=true;
-								break;
-							}
-						}
-						if(!inShadow)
-						{												
-							//Если значение RGB > чем текущее то заменяем его
-							currentColor.rgbRed+=coefLight*S[n].color.rgbRed*0.5;
-							currentColor.rgbGreen+=coefLight*S[n].color.rgbGreen*0.5;
-							currentColor.rgbBlue+=coefLight*S[n].color.rgbBlue*0.5;
-						}
-					}
-				}		
-				//Записываем в буфер конечный цвет
-				buffer[i+YRES/2][j+XRES/2]= RGB(currentColor.rgbRed,currentColor.rgbGreen,currentColor.rgbBlue);
-			}	//(kd*factor*R, kd*factor*G, kd*factor*B).+ (ka*R, ka*G, Ka*B).			
+			RGBQUAD currentColor=TraceOneRay(ray,S,lightsArray,1);
+			buffer[i+YRES/2][j+XRES/2]= RGB(currentColor.rgbRed,currentColor.rgbGreen,currentColor.rgbBlue);
+			
 		}
 	}
 	SetBitmapBits(bitmap,XRES*YRES*sizeof(buffer[0][0]),buffer);
