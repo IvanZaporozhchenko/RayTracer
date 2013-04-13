@@ -2,10 +2,148 @@
 #include "Infrastructure.h"
 #include <windows.h>
 #include <math.h>
+#include <float.h>
 
 #define BACKGROUND_COLOR RGB(20,20,20)
 
-COLORREF buffer[YRES][XRES];
+COLORREF buffer[YRES][XRES]; //Буфер пикселей изображения
+
+void NextVoxel(int x, int y, int z, CBox & sceneBox)
+{
+	CVector3D t, t2;
+	t.x = (float)x/(float)CELL_NUMBER;
+	t.y = (float)y/(float)CELL_NUMBER;
+	t.z = (float)z/(float)CELL_NUMBER;
+
+	t2.x = (float)(x+1)/(float)CELL_NUMBER;
+	t2.y = (float)(y+1)/(float)CELL_NUMBER;
+	t2.z = (float)(z+1)/(float)CELL_NUMBER;
+
+	CBox smallBox;
+	smallBox.leftBottomPoint.x = sceneBox.leftBottomPoint.x + t.x*sceneBox.length;
+	smallBox.leftBottomPoint.y = sceneBox.leftBottomPoint.y + t.y*sceneBox.height;
+	smallBox.leftBottomPoint.z = sceneBox.leftBottomPoint.z + t.z*sceneBox.width;
+
+	smallBox.length = t2.x*sceneBox.length;
+	smallBox.height = t2.y*sceneBox.height;
+	smallBox.width = t2.z*sceneBox.width;
+}
+
+bool * FujimotoTraverse3D(CRay ray, CBox sceneBox, CSphere SArray[])
+{
+	//будущий результат обнуляем
+	bool result[SPHERE_COUNT];
+	for (int i=0;i<SPHERE_COUNT;i++)
+	{
+		result[i]=false;
+	}
+	float  t_min=0;
+
+	if(!sceneBox.Intersect(ray, t_min))
+		return result;
+
+	if(t_min < 0)
+		t_min = 0;
+
+	float startX = ray.center.x + t_min*ray.vector.x;
+	float startY = ray.center.y + t_min*ray.vector.y;
+	float startZ = ray.center.z + t_min*ray.vector.z;
+
+	int cells=CELL_NUMBER;
+	int x = (int)((startX - sceneBox.leftBottomPoint.x)/(sceneBox.length)*cells);
+	int y = (int)((startY - sceneBox.leftBottomPoint.y)/(sceneBox.height)*cells);
+	int z = (int)((startZ - sceneBox.leftBottomPoint.z)/(sceneBox.width)*cells);
+
+	if(x == cells) x--;
+	if(y == cells) y--;
+	if(z == cells) z--;
+
+	float tVoxelX, tVoxelY,tVoxelZ; 
+	int stepX, stepY,stepZ;
+  
+	if(ray.vector.x > 0)
+	{
+		tVoxelX  = (float)(x+1)/(float)CELL_NUMBER;
+		stepX = 1;
+	}
+	else
+	{
+		tVoxelX  = (float)x/(float)CELL_NUMBER;
+		stepX = -1;
+	}
+
+	if(ray.vector.y > 0)
+	{
+		tVoxelY = (float)(y+1)/(float)CELL_NUMBER;
+		stepY = 1;
+	}
+	else
+	{
+		tVoxelY = (float)y/(float)CELL_NUMBER;
+		stepY = -1;
+	}
+
+	if(ray.vector.z > 0)
+	{
+		tVoxelZ = (float)(z+1)/(float)CELL_NUMBER;
+		stepZ = 1;
+	}
+	else
+	{
+		tVoxelZ = (float)z/(float)CELL_NUMBER;
+		stepZ = -1;
+	}
+
+	float voxelMaxX = sceneBox.leftBottomPoint.x + tVoxelX*sceneBox.length;
+	float voxelMaxY = sceneBox.leftBottomPoint.y + tVoxelY*sceneBox.height;
+	float voxelMaxZ = sceneBox.leftBottomPoint.z + tVoxelZ*sceneBox.width;
+
+	float tMaxX = t_min + (voxelMaxX - startX)/ray.vector.x;
+	float tMaxY = t_min + (voxelMaxY - startY)/ray.vector.y;
+	float tMaxZ = t_min + (voxelMaxZ - startZ)/ray.vector.z;
+
+	const float voxelSize = (sceneBox.length)/CELL_NUMBER;
+	const float tDeltaX = voxelSize/fabs(ray.vector.x);
+	const float tDeltaY = voxelSize/fabs(ray.vector.y);
+	const float tDeltaZ = voxelSize/fabs(ray.vector.z);
+	//NextVoxel(x, y, box);
+
+	while(x < cells && x >= 0 && 
+		y < cells && y >= 0 && z<cells && z>=0)
+	{
+		//Определяем какие сферы в данном боксе
+		for (int i=0;i<SPHERE_COUNT;i++)
+		{
+			if (x>=SArray[i].boxIndexes.minX && 
+				x<=SArray[i].boxIndexes.maxX &&
+				y>=SArray[i].boxIndexes.minY &&
+				y<=SArray[i].boxIndexes.maxY &&
+				z>=SArray[i].boxIndexes.minZ &&
+				z<=SArray[i].boxIndexes.maxZ)
+			{
+				result[i]=true;
+			}
+		}
+    
+		if(tMaxX <= tMaxY && tMaxX <= tMaxZ)
+		{
+			tMaxX += tDeltaX;
+			x += stepX;
+		}
+		else if(tMaxY <= tMaxZ && tMaxY <= tMaxX)
+		{
+			tMaxY += tDeltaY;
+			y += stepY;
+		}
+		else
+		{
+			tMaxZ += tDeltaZ;
+			z += stepZ;
+		}
+	}
+	return result;
+}
+
 
 //************************************
 // Method:    checkIntersection
@@ -18,16 +156,22 @@ COLORREF buffer[YRES][XRES];
 // Parameter: CRVector3D * hit - точка пересечения
 // Parameter: int * n - номер объекта с которым находится ближайшее пересечение
 //************************************
-bool checkIntersection(CRay ray, CSphere sphereArray[], CVector3D * hit, int * n)
+bool checkIntersection(CRay ray, CSphere sphereArray[], CVector3D * hit, int * n, CBox sceneBox)
 {
 	float a,b,c,D,t,tmin;
 	bool intersectionFinded=false;
 	tmin=30000;
+
+	bool * fujimotoSpheres =FujimotoTraverse3D(ray,sceneBox,sphereArray);
 	//Проверка на столкновение
 	//Формулы сзяты с данного сайта http://www.cs.huji.ac.il/course/2006/cg/slides/raytracing.pdf
 	//Решаем квадратное уравнение 
 	for (int i=0; i<SPHERE_COUNT; i++)
 	{	
+		if (fujimotoSpheres[i]==false)
+		{
+			continue;
+		}
 		CSphere S=sphereArray[i];
 		a = 1;
 		b=2*((ray.center-S.center)*ray.vector);           
@@ -72,7 +216,7 @@ bool checkIntersection(CRay ray, CSphere sphereArray[], CVector3D * hit, int * n
 	return intersectionFinded;
 }
 
-RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
+RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level, CBox sceneBox)
 {
 	int n;
 	RGBQUAD currentColor;
@@ -80,7 +224,8 @@ RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
 	currentColor.rgbGreen=20;
 	currentColor.rgbRed=20;
 	CVector3D hit,light,lightdir,snormal;
-	if(checkIntersection(ray,S,&hit,&n)) 
+
+	if(checkIntersection(ray,S,&hit,&n,sceneBox)) 
 	{	
 		currentColor.rgbBlue=0;
 		currentColor.rgbGreen=0;
@@ -114,7 +259,7 @@ RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
 						continue;*/
 					CVector3D lightHit;
 					int num;
-					if (checkIntersection(lightRay,S,&lightHit,&num))
+					if (checkIntersection(lightRay,S,&lightHit,&num,sceneBox))
 					{
 						inShadow=true;
 						break;
@@ -132,10 +277,12 @@ RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
 						//coef*=reflectionVector*ray.vector;
 						coef*=0.5;
 					}
-
-					if(level<10)
+					reflectionColor.rgbBlue=0;
+					reflectionColor.rgbGreen=0;
+					reflectionColor.rgbRed=0;
+					if(level<7)
 					{
-						reflectionColor=TraceOneRay(reflectionRay,S,lightsArray,++level);
+						reflectionColor=TraceOneRay(reflectionRay,S,lightsArray,++level,sceneBox);
 					}
 					
 					//Свет по Ламберту
@@ -224,21 +371,17 @@ RGBQUAD TraceOneRay(CRay ray, CSphere S[], CVector3D lightsArray[],int level)
 // Parameter: CSphere S[] - массив из сфер, пока что так
 // Parameter: CRVector3D lightsArray[] - массив из точечных источников света
 //************************************
-void RayTracer(HBITMAP bitmap,CSphere S[], CVector3D lightsArray[])
+void RayTracer(HBITMAP bitmap,CSphere S[], CVector3D lightsArray[], CBox sceneBox)
 {
 	CVector2D tt;
 	int i,j;
 	float a,b,c,D,t,coefLight;
 	CVector3D rayVector,snormal,lightdir,light;
 	//Выбрасываем каждый луч
-	for(i=-500/2;i<500/2;i++)
+	for(i=-YRES/2;i<YRES/2;i++)
 	{
-		for(j=-500/2;j<500/2;j++)
+		for(j=-XRES/2;j<XRES/2;j++)
 		{
-			if (j==100 && i==0)
-			{
-				int bla=0;
-			}
 			//Изначально задаем цвет фона
 			buffer[i+YRES/2][j+XRES/2]=BACKGROUND_COLOR;
 			//Вычиляем вектор для луча
@@ -250,7 +393,7 @@ void RayTracer(HBITMAP bitmap,CSphere S[], CVector3D lightsArray[])
 			CVector3D hit;
 			CVector3D eye(0,0,0);
 			CRay ray(eye,rayVector);
-			RGBQUAD currentColor=TraceOneRay(ray,S,lightsArray,1);
+			RGBQUAD currentColor=TraceOneRay(ray,S,lightsArray,1,sceneBox);
 			buffer[i+YRES/2][j+XRES/2]= RGB(currentColor.rgbRed,currentColor.rgbGreen,currentColor.rgbBlue);
 			
 		}

@@ -1,8 +1,66 @@
 #include <windows.h>
+#include <float.h>
 #include "Infrastructure.h"
 #include "RayTracer.h"
 
 LRESULT _stdcall WndProc (HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam );
+
+CBox boxForSphere(CSphere sphere)
+{
+	return CBox(
+			sphere.center.x-sphere.R,
+			sphere.center.y-sphere.R,
+			sphere.center.z-sphere.R,
+			sphere.R*2,
+			sphere.R*2,
+			sphere.R*2);
+}
+
+CBox buildHierarhicalGrid(CSphere sphereArray[])
+{
+	CVector3D allPoints[SPHERE_COUNT*8];
+	float xMin=FLT_MAX,
+		xMax=FLT_MIN,
+		yMin=FLT_MAX,
+		yMax=FLT_MIN,
+		zMin=FLT_MAX,
+		zMax=FLT_MIN;
+	for (int sphereIndex=0;sphereIndex<SPHERE_COUNT;sphereIndex++)
+	{
+		CBox boxForCurrentSphere=boxForSphere(sphereArray[sphereIndex]);
+		for (int i=0;i<8;i++)
+		{
+			allPoints[sphereIndex*8+i]=boxForCurrentSphere.Points()[i];
+			if (allPoints[sphereIndex*8+i].x<xMin)
+			{
+				xMin=allPoints[sphereIndex*8+i].x;
+			}
+			if (allPoints[sphereIndex*8+i].y<yMin)
+			{
+				yMin=allPoints[sphereIndex*8+i].y;
+			}
+			if (allPoints[sphereIndex*8+i].z<zMin)
+			{
+				zMin=allPoints[sphereIndex*8+i].z;
+			}
+			if (allPoints[sphereIndex*8+i].x>xMax)
+			{
+				xMax=allPoints[sphereIndex*8+i].x;
+			}
+			if (allPoints[sphereIndex*8+i].y>yMax)
+			{
+				yMax=allPoints[sphereIndex*8+i].y;
+			}
+			if (allPoints[sphereIndex*8+i].z>zMax)
+			{
+				zMax=allPoints[sphereIndex*8+i].z;
+			}
+		}
+	}
+	CBox bigSceneBox(xMin,yMin,zMin,xMax-xMin,yMax-yMin,zMax-zMin);
+	return bigSceneBox;
+}
+
 
 int _stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
@@ -32,13 +90,13 @@ int _stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 	HWND hWnd = CreateWindow(
 		"class",
 		"RayTracer",
-		WS_OVERLAPPEDWINDOW,100,100,600,600,
+		WS_OVERLAPPEDWINDOW,0,0,800,800,
 		NULL,NULL,hInstance,NULL);
 
 	ShowWindow(hWnd,nCmdShow);
 	UpdateWindow(hWnd);
 	MSG msg;
-	DWORD bits[500][500];
+	DWORD bits[XRES][YRES];
 	HBITMAP hBitmap;
 	RGBQUAD color;
 	float x,y,z,r;
@@ -55,6 +113,21 @@ int _stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 		r=(rand()%5+5)/10.0f;
 		SArray[i]=CSphere(x,y,z,r,color);	
 	}
+	//Находим ограничивающий бокс для сцены
+	CBox sceneBox =	buildHierarhicalGrid(SArray);
+
+	//Находим боксы в которых находятся сферы и хапоминаем их
+	for (int i=0; i<SPHERE_COUNT; i++)
+	{
+		int cells=CELL_NUMBER;
+		CBox boxForCurrentSphere = boxForSphere(SArray[i]); 
+		SArray[i].boxIndexes.minX = (int)((boxForCurrentSphere.leftBottomPoint.x - sceneBox.leftBottomPoint.x)/(sceneBox.length)*cells);
+		SArray[i].boxIndexes.maxX = (int)((boxForCurrentSphere.Points()[7].x - sceneBox.leftBottomPoint.x)/(sceneBox.length)*cells);
+		SArray[i].boxIndexes.minY = (int)((boxForCurrentSphere.leftBottomPoint.y - sceneBox.leftBottomPoint.y)/(sceneBox.height)*cells);
+		SArray[i].boxIndexes.maxY = (int)((boxForCurrentSphere.Points()[7].y - sceneBox.leftBottomPoint.y)/(sceneBox.height)*cells);
+		SArray[i].boxIndexes.minZ = (int)((boxForCurrentSphere.leftBottomPoint.z - sceneBox.leftBottomPoint.z)/(sceneBox.width)*cells);
+		SArray[i].boxIndexes.maxZ = (int)((boxForCurrentSphere.Points()[7].z - sceneBox.leftBottomPoint.z)/(sceneBox.width)*cells);
+	}
 	
 	CVector3D lightArray[LIGHT_COUNT];
 
@@ -66,7 +139,7 @@ int _stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 	}
 
 	
-	hBitmap=CreateBitmap(500,500,1,32,bits);
+	hBitmap=CreateBitmap(XRES,YRES,1,32,bits);
 	while(true)
 	{
 		if(PeekMessage(&msg,0,0,0,PM_REMOVE))
@@ -83,12 +156,12 @@ int _stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 			//Рендеринг
 			
 			
-			RayTracer(hBitmap,SArray,lightArray);
+			RayTracer(hBitmap,SArray,lightArray,sceneBox);
 
 			HDC hdc = GetDC(hWnd); // Get the DC from that HWND
 			HDC hdcMem = CreateCompatibleDC(hdc);   
 			SelectObject(hdcMem, hBitmap);
-			BitBlt(hdc, 0, 0, 500, 500, hdcMem, 0, 0, SRCCOPY);
+			BitBlt(hdc, 0, 0, XRES, YRES, hdcMem, 0, 0, SRCCOPY);
 			DeleteDC(hdcMem);
 			DeleteDC(hdc); // Delete the DC
 			//Подсчет FPS

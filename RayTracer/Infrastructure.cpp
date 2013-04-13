@@ -116,6 +116,62 @@ CSphere::CSphere(float x,float y,float z,float r,RGBQUAD color)
 	this->color=color;
 }
 
+CBox::CBox()
+{
+	
+}
+
+CBox::CBox(float x,float y,float z,float length,float height,float width)
+{
+	CVector3D center(x,y,z);
+	this->leftBottomPoint=center;
+	this->height=height;
+	this->length=length;
+	this->width=width;
+}
+
+CVector3D * CBox::Points()
+{
+	CVector3D points[8];
+	points[0]=leftBottomPoint;
+	points[1]=CVector3D(leftBottomPoint.x+length,leftBottomPoint.y,leftBottomPoint.z);
+	points[2]=CVector3D(leftBottomPoint.x,leftBottomPoint.y+height,leftBottomPoint.z);
+	points[3]=CVector3D(leftBottomPoint.x,leftBottomPoint.y,leftBottomPoint.z+width);
+	points[4]=CVector3D(leftBottomPoint.x+length,leftBottomPoint.y+height,leftBottomPoint.z);
+	points[5]=CVector3D(leftBottomPoint.x+length,leftBottomPoint.y,leftBottomPoint.z+width);
+	points[6]=CVector3D(leftBottomPoint.x,leftBottomPoint.y+height,leftBottomPoint.z+width);
+	points[7]=CVector3D(leftBottomPoint.x+length,leftBottomPoint.y+height,leftBottomPoint.z+width);
+	return points;
+}
+
+// Optimized method взято с http://www.cs.utah.edu/~awilliam/box/box.pdf
+bool CBox::Intersect(CRay &r, float &tmin) 
+{
+	CVector3D bounds[2];
+	bounds[0]=leftBottomPoint;
+	bounds[1]=Points()[7];
+	float tmax, tymin, tymax, tzmin, tzmax;
+	tmin = (bounds[r.sign[0]].x - r.center.x) * r.inverted_direction.x;
+	tmax = (bounds[1-r.sign[0]].x - r.center.x) * r.inverted_direction.x;
+	tymin = (bounds[r.sign[1]].y - r.center.y) * r.inverted_direction.y;
+	tymax = (bounds[1-r.sign[1]].y - r.center.y) * r.inverted_direction.y;
+	if ( (tmin > tymax) || (tymin > tmax) )
+		return false;
+	if (tymin > tmin)
+		tmin = tymin;
+	if (tymax < tmax)
+		tmax = tymax;
+	tzmin = (bounds[r.sign[2]].z - r.center.z) * r.inverted_direction.z;
+	tzmax = (bounds[1-r.sign[2]].z - r.center.z) * r.inverted_direction.z;
+	if ( (tmin > tzmax) || (tzmin > tmax) )
+		return false;
+	if (tzmin > tmin)
+		tmin = tzmin;
+	if (tzmax < tmax)
+		tmax = tzmax;	
+	return ( (tmin <= tmax) && (tmax > 0) );
+}
+
 CRay::CRay(CVector3D center, CVector3D vector)
 {
 	this->center.x=center.x;
@@ -124,6 +180,10 @@ CRay::CRay(CVector3D center, CVector3D vector)
 	this->vector.x=vector.x;
 	this->vector.y=vector.y;
 	this->vector.z=vector.z;
+	this->inverted_direction=CVector3D(1/vector.x,1/vector.y,1/vector.z);
+	sign[0] = (inverted_direction.x < 0);
+	sign[1] = (inverted_direction.y < 0);
+	sign[2] = (inverted_direction.z < 0);
 }
 
 

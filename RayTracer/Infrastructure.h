@@ -1,13 +1,25 @@
 #pragma once
 
 #include <windows.h>
-#include <xmmintrin.h>
 
 #define DIST 1
-#define XRES 500
-#define YRES 500
-#define SPHERE_COUNT 10
+#define XRES 640
+#define YRES 480
+#define SPHERE_COUNT 2
 #define LIGHT_COUNT 1
+#define CELL_NUMBER 100;
+
+
+struct BoxIndexes
+{
+public:
+	int minX;
+	int maxX;
+	int minY;
+	int maxY;
+	int minZ;
+	int maxZ;
+};
 
 class CVector2D 
 {
@@ -42,6 +54,7 @@ public:
 	RGBQUAD color;
 	CSphere::CSphere();
 	CSphere::CSphere(float x,float y,float z,float r,RGBQUAD color);
+	BoxIndexes boxIndexes;
 };
 
 class CRay
@@ -49,9 +62,26 @@ class CRay
 public:
 	CVector3D center;
 	CVector3D vector;
-
+	int sign[3];
+	CVector3D inverted_direction;
 	CRay(CVector3D center, CVector3D vector);
+	
 };
+
+class CBox
+{ 
+public:
+	CVector3D leftBottomPoint;
+	float length;
+	float width;
+	float height;
+	CBox::CBox();
+	CBox::CBox(float x,float y,float z,float length,float width,float height);
+	CVector3D* Points();
+	bool Intersect(CRay &r, float & t_min);
+};
+
+
 
 CVector3D operator * (float scalar, const CVector3D& vector);
 

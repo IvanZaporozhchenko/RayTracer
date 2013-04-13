@@ -12,4 +12,4 @@
 // Parameter: CSphere S[] - массив из сфер, пока что так
 // Parameter: CRVector3D lightsArray[] - массив из точечных источников света
 //************************************
-void RayTracer(HBITMAP bitmap,CSphere S[],CVector3D lights[]);
+void RayTracer(HBITMAP bitmap,CSphere S[],CVector3D lights[], CBox sceneBox);
